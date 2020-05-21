@@ -3,15 +3,14 @@ package router
 import (
 	"context"
 	"fmt"
-	"github.com/akleinloog/http-logger/app"
 	"github.com/akleinloog/http-logger/util/logger"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"net/http"
 )
 
-// New initializes a new router.
-func New(app *app.App) *chi.Mux {
+// New instantiates a new router.
+func New() *chi.Mux {
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -20,12 +19,10 @@ func New(app *app.App) *chi.Mux {
 	router.Use(logger.RequestLogger)
 	router.Use(middleware.Recoverer)
 	router.Use(addUserContext)
-	//router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-	//	w.Write([]byte("welcome"))
-	//})
-	router.Get("/", handleIndex)
 
-	//router.MethodFunc("GET", "/", HandleIndex)
+	router.Get("/", handleIndex)
+	router.Get("/hello", handleHello())
+
 	return router
 }
 
@@ -42,8 +39,13 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	//w.Write([]byte("Welcome!"))
+	w.Write([]byte("Request Received"))
+}
 
-	user := r.Context().Value("user").(string)
-	w.Write([]byte(fmt.Sprintf("Hi %s", user)))
+func handleHello() http.HandlerFunc {
+	greeting := "Hello"
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value("user").(string)
+		w.Write([]byte(fmt.Sprintf("%s %s", greeting, user)))
+	}
 }

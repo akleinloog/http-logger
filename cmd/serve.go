@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"github.com/akleinloog/http-logger/app"
-	"github.com/akleinloog/http-logger/router"
 	"net/http"
 	"time"
 
@@ -37,18 +36,17 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		application := app.Instance()
-		logger := application.Logger()
-		config := application.Config()
+		server := app.Instance()
+		logger := server.Logger()
+		config := server.Config()
 
 		logger.Info().Msgf("Starting server on port: %d\n", config.Server.Port)
 
-		router := router.New(application)
 		address := fmt.Sprintf("%s:%d", "", config.Server.Port)
 
 		s := &http.Server{
 			Addr:         address,
-			Handler:      router,
+			Handler:      server.Router(),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  120 * time.Second,
