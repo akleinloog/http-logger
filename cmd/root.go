@@ -28,27 +28,34 @@ import (
 
 var cfgFile string
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd is the base command, executed when called without sub-commands
 var rootCmd = &cobra.Command{
 	Use:   "httplog",
 	Short: "HTTP Logger",
 	Long: `Simple HTTP Logger
-Listens on port N and logs HTTP traffic.
-
-Start Server:
-httplog serve`,
-	Run: func(cmd *cobra.Command, args []string) {
-
-		fmt.Printf("running on port: %d\n", viper.GetInt("port"))
-
-	},
+`,
+	//Run: func(cmd *cobra.Command, args []string) {},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+// init is called before Execute is called to execute the command.
+func init() {
+
+	cobra.OnInitialize(initConfig)
+
+	// Persistent flags are global for all commands.
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.httplog.yaml)")
+
+	rootCmd.PersistentFlags().IntP("port", "p", 80, "port numbert (default is 80")
+
+	// Local flags are specific for this command.
+
+	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+// Execute executes the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-
-	fmt.Println("Executing Command")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -56,29 +63,8 @@ func Execute() {
 	}
 }
 
-func init() {
-
-	fmt.Println("Initializing")
-
-	cobra.OnInitialize(initConfig)
-
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.httplog.yaml)")
-
-	rootCmd.PersistentFlags().IntP("port", "p", 80, "port numbert (default is 80")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
-
-// initConfig reads in config file and ENV variables if set.
+// initConfig initializes the viper configuration.
 func initConfig() {
-
-	fmt.Println("Initializing Configuration")
 
 	if cfgFile != "" {
 		// Use config file from the flag.
@@ -97,7 +83,7 @@ func initConfig() {
 		viper.SetConfigName(".httplog")
 	}
 
-	fmt.Println("Binding Flags")
+	// Binding Flags
 	if err := viper.BindPFlags(rootCmd.Flags()); err != nil {
 		fmt.Println("Error binding root flags:", err)
 	}

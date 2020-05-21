@@ -37,15 +37,19 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		fmt.Printf("Starting server on port: %d\n", viper.GetInt("port"))
+		port := viper.GetInt("port")
+
+		fmt.Printf("Starting server on port: %d\n", port)
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", root)
 		mux.HandleFunc("/hello", hello)
 		mux.HandleFunc("/headers", headers)
 
+		addr := fmt.Sprintf("%s:%d", "", port)
+
 		server := &http.Server{
-			Addr:         ":80",
+			Addr:         addr,
 			Handler:      mux,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
