@@ -16,7 +16,7 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
+	"github.com/akleinloog/http-logger/app"
 	"github.com/akleinloog/http-logger/config"
 	"github.com/spf13/cobra"
 	"os"
@@ -55,7 +55,10 @@ func init() {
 func Execute() {
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+
+		logger := app.Instance().Logger()
+		logger.Fatal().Err(err).Msg("Fatal during root command execution")
+
 		os.Exit(1)
 	}
 }

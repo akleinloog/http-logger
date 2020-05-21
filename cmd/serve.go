@@ -17,9 +17,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/akleinloog/http-logger/config"
+	"github.com/akleinloog/http-logger/app"
 	"github.com/akleinloog/http-logger/router"
-	"github.com/akleinloog/http-logger/util/logger"
 	"net/http"
 	"time"
 
@@ -38,12 +37,13 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		config := config.AppConfig()
+		application := app.Instance()
+		logger := application.Logger()
+		config := application.Config()
 
-		logger := logger.NewConsole(config.Debug)
-		logger.Debug().Msgf("Starting server on port: %d\n", config.Server.Port)
+		logger.Info().Msgf("Starting server on port: %d\n", config.Server.Port)
 
-		router := router.New()
+		router := router.New(application)
 		address := fmt.Sprintf("%s:%d", "", config.Server.Port)
 
 		s := &http.Server{
@@ -55,7 +55,7 @@ to quickly create a Cobra application.`,
 		}
 
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal().Err(err).Msg("Server startup failed")
+			logger.Fatal().Err(err).Msg("Error occurred while listening and serving")
 		}
 	},
 }

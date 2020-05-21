@@ -9,7 +9,13 @@ import (
 	"strings"
 )
 
-var cfgFile string
+var (
+	// configFile points to the configuration file.
+	configFile string
+
+	// DefaultConfig holds the default configuration.
+	DefaultConfig = AppConfig()
+)
 
 type Config struct {
 	Debug  bool `env:"DEBUG, defaults to false"`
@@ -47,9 +53,9 @@ func AppConfig() *Config {
 // Initialize initializes the viper configuration.
 func Initialize(rootCommand *cobra.Command) {
 
-	if cfgFile != "" {
+	if configFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+		viper.SetConfigFile(configFile)
 	} else {
 		// Find home directory.
 		home, err := homedir.Dir()

@@ -1,39 +1,91 @@
 package logger
 
 import (
+	"bufio"
 	"context"
 	"io"
+	"net"
+	"net/http"
 	"os"
+	"time"
+
+	"github.com/akleinloog/http-logger/config"
 
 	"github.com/rs/zerolog"
 )
 
+var (
+	// LogEntryCtxKey is the context.Context key to store the request log entry.
+	//LogEntryCtxKey = &contextKey{"LogEntry"}
+
+	// DefaultLogger is called by the Logger middleware handler to log each request.
+	// Its made a package-level variable so that it can be reconfigured for custom
+	// logging configurations.
+	//DefaultLogger = New(config.DefaultConfig)
+
+	DefaultLogger = New(config.DefaultConfig)
+)
+
+// Logger is used for logging.
 type Logger struct {
 	logger *zerolog.Logger
 }
 
-func New(isDebug bool) *Logger {
+type RequestLogEntry struct {
+	Method    string
+	URL       string
+	UserAgent string
+	Referer   string
+	Protocol  string
+	RemoteIP  string
+	ServerIP  string
+	Status    int
+	Latency   time.Duration
+}
+
+// New initializes a new logger
+func New(config *config.Config) *Logger {
+
 	logLevel := zerolog.InfoLevel
-	if isDebug {
+
+	if config.Debug {
 		logLevel = zerolog.DebugLevel
 	}
 
 	zerolog.SetGlobalLevel(logLevel)
-	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	return &Logger{logger: &logger}
 }
 
-func NewConsole(isDebug bool) *Logger {
-	logLevel := zerolog.InfoLevel
-	if isDebug {
-		logLevel = zerolog.DebugLevel
+func NewRequestEntry(r *http.Request) *RequestLogEntry {
+
+	le := &RequestLogEntry{
+		Method:    r.Method,
+		URL:       r.URL.String(),
+		UserAgent: r.UserAgent(),
+		Referer:   r.Referer(),
+		Protocol:  r.Proto,
+		RemoteIP:  ipFromHostPort(r.RemoteAddr),
 	}
 
-	zerolog.SetGlobalLevel(logLevel)
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		le.ServerIP = ipFromHostPort(addr.String())
+	}
 
-	return &Logger{logger: &logger}
+	return le
+}
+
+func ipFromHostPort(hp string) string {
+	h, _, err := net.SplitHostPort(hp)
+	if err != nil {
+		return ""
+	}
+	if len(h) > 0 && h[0] == '[' {
+		return h[1 : len(h)-1]
+	}
+	return h
 }
 
 // Output duplicates the global logger and sets w as its output.
@@ -137,3 +189,222 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 func (l *Logger) Ctx(ctx context.Context) *Logger {
 	return &Logger{logger: zerolog.Ctx(ctx)}
 }
+
+// RequestLogger is a middleware that logs the start and end of each request, along
+// with some useful data about what was requested, what the response status was,
+// and how long it took to return. When standard output is a TTY, Logger will
+// print in color, otherwise it will print in black and white. Logger prints a
+// request ID if one is provided.
+//
+// Alternatively, look at https://github.com/goware/httplog for a more in-depth
+// http logger with structured logging support.
+func RequestLogger(next http.Handler) http.Handler {
+
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		entry := NewRequestEntry(r)
+		ww := NewWrapResponseWriter(w, r.ProtoMajor)
+
+		start := time.Now()
+
+		defer func() {
+
+			entry.Latency = time.Since(start)
+
+			entry.Status = ww.Status()
+
+			if entry.Status == 0 {
+				entry.Status = http.StatusOK
+			}
+
+			DefaultLogger.Info().
+				Str("method", entry.Method).
+				Str("url", entry.URL).
+				Str("agent", entry.UserAgent).
+				Str("referer", entry.Referer).
+				Str("protocol", entry.Protocol).
+				Str("remote_ip", entry.RemoteIP).
+				Str("server_ip", entry.ServerIP).
+				Int("status", entry.Status).
+				Dur("latency", entry.Latency).
+				Msg("")
+		}()
+
+		next.ServeHTTP(ww, WithLogEntry(r, entry))
+	}
+
+	return http.HandlerFunc(fn)
+}
+
+func WithLogEntry(r *http.Request, entry *RequestLogEntry) *http.Request {
+	r = r.WithContext(context.WithValue(r.Context(), "requestLog", entry))
+	return r
+}
+
+// NewWrapResponseWriter wraps an http.ResponseWriter, returning a proxy that allows you to
+// hook into various parts of the response process.
+func NewWrapResponseWriter(w http.ResponseWriter, protoMajor int) WrapResponseWriter {
+	_, fl := w.(http.Flusher)
+
+	bw := basicWriter{ResponseWriter: w}
+
+	if protoMajor == 2 {
+		_, ps := w.(http.Pusher)
+		if fl && ps {
+			return &http2FancyWriter{bw}
+		}
+	} else {
+		_, hj := w.(http.Hijacker)
+		_, rf := w.(io.ReaderFrom)
+		if fl && hj && rf {
+			return &httpFancyWriter{bw}
+		}
+	}
+	if fl {
+		return &flushWriter{bw}
+	}
+
+	return &bw
+}
+
+// WrapResponseWriter is a proxy around an http.ResponseWriter that allows you to hook
+// into various parts of the response process.
+type WrapResponseWriter interface {
+	http.ResponseWriter
+	// Status returns the HTTP status of the request, or 0 if one has not
+	// yet been sent.
+	Status() int
+	// BytesWritten returns the total number of bytes sent to the client.
+	BytesWritten() int
+	// Tee causes the response body to be written to the given io.Writer in
+	// addition to proxying the writes through. Only one io.Writer can be
+	// tee'd to at once: setting a second one will overwrite the first.
+	// Writes will be sent to the proxy before being written to this
+	// io.Writer. It is illegal for the tee'd writer to be modified
+	// concurrently with writes.
+	Tee(io.Writer)
+	// Unwrap returns the original proxied target.
+	Unwrap() http.ResponseWriter
+}
+
+// basicWriter wraps a http.ResponseWriter that implements the minimal
+// http.ResponseWriter interface.
+type basicWriter struct {
+	http.ResponseWriter
+	wroteHeader bool
+	code        int
+	bytes       int
+	tee         io.Writer
+}
+
+func (b *basicWriter) WriteHeader(code int) {
+	if !b.wroteHeader {
+		b.code = code
+		b.wroteHeader = true
+		b.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (b *basicWriter) Write(buf []byte) (int, error) {
+	b.maybeWriteHeader()
+	n, err := b.ResponseWriter.Write(buf)
+	if b.tee != nil {
+		_, err2 := b.tee.Write(buf[:n])
+		// Prefer errors generated by the proxied writer.
+		if err == nil {
+			err = err2
+		}
+	}
+	b.bytes += n
+	return n, err
+}
+
+func (b *basicWriter) maybeWriteHeader() {
+	if !b.wroteHeader {
+		b.WriteHeader(http.StatusOK)
+	}
+}
+
+func (b *basicWriter) Status() int {
+	return b.code
+}
+
+func (b *basicWriter) BytesWritten() int {
+	return b.bytes
+}
+
+func (b *basicWriter) Tee(w io.Writer) {
+	b.tee = w
+}
+
+func (b *basicWriter) Unwrap() http.ResponseWriter {
+	return b.ResponseWriter
+}
+
+type flushWriter struct {
+	basicWriter
+}
+
+func (f *flushWriter) Flush() {
+	f.wroteHeader = true
+	fl := f.basicWriter.ResponseWriter.(http.Flusher)
+	fl.Flush()
+}
+
+var _ http.Flusher = &flushWriter{}
+
+// httpFancyWriter is a HTTP writer that additionally satisfies
+// http.Flusher, http.Hijacker, and io.ReaderFrom. It exists for the common case
+// of wrapping the http.ResponseWriter that package http gives you, in order to
+// make the proxied object support the full method set of the proxied object.
+type httpFancyWriter struct {
+	basicWriter
+}
+
+func (f *httpFancyWriter) Flush() {
+	f.wroteHeader = true
+	fl := f.basicWriter.ResponseWriter.(http.Flusher)
+	fl.Flush()
+}
+
+func (f *httpFancyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj := f.basicWriter.ResponseWriter.(http.Hijacker)
+	return hj.Hijack()
+}
+
+func (f *http2FancyWriter) Push(target string, opts *http.PushOptions) error {
+	return f.basicWriter.ResponseWriter.(http.Pusher).Push(target, opts)
+}
+
+func (f *httpFancyWriter) ReadFrom(r io.Reader) (int64, error) {
+	if f.basicWriter.tee != nil {
+		n, err := io.Copy(&f.basicWriter, r)
+		f.basicWriter.bytes += int(n)
+		return n, err
+	}
+	rf := f.basicWriter.ResponseWriter.(io.ReaderFrom)
+	f.basicWriter.maybeWriteHeader()
+	n, err := rf.ReadFrom(r)
+	f.basicWriter.bytes += int(n)
+	return n, err
+}
+
+var _ http.Flusher = &httpFancyWriter{}
+var _ http.Hijacker = &httpFancyWriter{}
+var _ http.Pusher = &http2FancyWriter{}
+var _ io.ReaderFrom = &httpFancyWriter{}
+
+// http2FancyWriter is a HTTP2 writer that additionally satisfies
+// http.Flusher, and io.ReaderFrom. It exists for the common case
+// of wrapping the http.ResponseWriter that package http gives you, in order to
+// make the proxied object support the full method set of the proxied object.
+type http2FancyWriter struct {
+	basicWriter
+}
+
+func (f *http2FancyWriter) Flush() {
+	f.wroteHeader = true
+	fl := f.basicWriter.ResponseWriter.(http.Flusher)
+	fl.Flush()
+}
+
+var _ http.Flusher = &http2FancyWriter{}

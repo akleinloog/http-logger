@@ -3,16 +3,21 @@ package router
 import (
 	"context"
 	"fmt"
+	"github.com/akleinloog/http-logger/app"
+	"github.com/akleinloog/http-logger/util/logger"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"net/http"
 )
 
-func New() *chi.Mux {
+// New initializes a new router.
+func New(app *app.App) *chi.Mux {
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
-	router.Use(middleware.Logger)
+	//router.Use(middleware.Logger)
+	router.Use(logger.RequestLogger)
 	router.Use(middleware.Recoverer)
 	router.Use(addUserContext)
 	//router.Get("/", func(w http.ResponseWriter, r *http.Request) {
