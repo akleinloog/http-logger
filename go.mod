@@ -1,4 +1,4 @@
-module github.com/kleinloog/http-logger
+module github.com/akleinloog/http-logger
 
 go 1.14
 

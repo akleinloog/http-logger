@@ -7,12 +7,12 @@ WORKDIR /go/src/gRPCgo
 ADD ./ .
 
 #RUN go get -u google.golang.org/grpc
-RUN CGO_ENABLED=0 go build -o server.exe
+RUN CGO_ENABLED=0 go build -o httplog.exe
 
 # Deploy Stage
 FROM scratch
 
-COPY --from=builder /go/src/gRPCgo/server.exe .
+COPY --from=builder /go/src/gRPCgo/httplog.exe .
 
 EXPOSE 80
-CMD ["./server.exe",  "serve"]
+CMD ["./httplog.exe",  "serve"]
