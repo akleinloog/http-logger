@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/akleinloog/http-logger/router"
 	"log"
 	"net/http"
 	"time"
@@ -41,23 +42,19 @@ to quickly create a Cobra application.`,
 
 		fmt.Printf("Starting server on port: %d\n", port)
 
-		mux := http.NewServeMux()
-		mux.HandleFunc("/", root)
-		mux.HandleFunc("/hello", hello)
-		mux.HandleFunc("/headers", headers)
+		router := router.New()
+		address := fmt.Sprintf("%s:%d", "", port)
 
-		addr := fmt.Sprintf("%s:%d", "", port)
-
-		server := &http.Server{
-			Addr:         addr,
-			Handler:      mux,
+		s := &http.Server{
+			Addr:         address,
+			Handler:      router,
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  120 * time.Second,
 		}
 
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal("Server startup failed")
+		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("Server startup failed", err)
 		}
 	},
 }
