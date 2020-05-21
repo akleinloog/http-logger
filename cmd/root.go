@@ -17,16 +17,10 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"strings"
-
+	"github.com/akleinloog/http-logger/config"
 	"github.com/spf13/cobra"
-
-	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/viper"
+	"os"
 )
-
-var cfgFile string
 
 // rootCmd is the base command, executed when called without sub-commands
 var rootCmd = &cobra.Command{
@@ -40,14 +34,17 @@ var rootCmd = &cobra.Command{
 // init is called before Execute is called to execute the command.
 func init() {
 
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(func() {
+		config.Initialize(rootCmd)
+	})
 
 	// Persistent flags are global for all commands.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.httplog.yaml)")
+	rootCmd.PersistentFlags().StringP("config", "c", "", "config file (default is empty)")
 
 	rootCmd.PersistentFlags().IntP("port", "p", 80, "port numbert (default is 80")
 
+	rootCmd.PersistentFlags().BoolP("debug", "d", false, "debug mode (default is false)")
 	// Local flags are specific for this command.
 
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -60,40 +57,5 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
-	}
-}
-
-// initConfig initializes the viper configuration.
-func initConfig() {
-
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".httplog" (without extension).
-		viper.AddConfigPath("./")
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".httplog")
-	}
-
-	// Binding Flags
-	if err := viper.BindPFlags(rootCmd.Flags()); err != nil {
-		fmt.Println("Error binding root flags:", err)
-	}
-
-	viper.SetEnvPrefix("HTTPLOG")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }

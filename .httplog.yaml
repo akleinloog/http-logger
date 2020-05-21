@@ -1,1 +1,2 @@
 port: 10080
+debug: true

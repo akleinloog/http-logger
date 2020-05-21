@@ -5,11 +5,10 @@ package logger_test
 import (
 	"errors"
 	"flag"
+	"github.com/akleinloog/http-logger/util/logger"
 	"time"
 
 	"github.com/rs/zerolog"
-
-	"logger"
 )
 
 // setup would normally be an init() function, however, there seems

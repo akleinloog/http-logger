@@ -17,13 +17,13 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/akleinloog/http-logger/config"
 	"github.com/akleinloog/http-logger/router"
-	"log"
+	"github.com/akleinloog/http-logger/util/logger"
 	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // serveCmd represents the serve command
@@ -38,12 +38,13 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		port := viper.GetInt("port")
+		config := config.AppConfig()
 
-		fmt.Printf("Starting server on port: %d\n", port)
+		logger := logger.NewConsole(config.Debug)
+		logger.Debug().Msgf("Starting server on port: %d\n", config.Server.Port)
 
 		router := router.New()
-		address := fmt.Sprintf("%s:%d", "", port)
+		address := fmt.Sprintf("%s:%d", "", config.Server.Port)
 
 		s := &http.Server{
 			Addr:         address,
@@ -54,7 +55,7 @@ to quickly create a Cobra application.`,
 		}
 
 		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal("Server startup failed", err)
+			logger.Fatal().Err(err).Msg("Server startup failed")
 		}
 	},
 }
