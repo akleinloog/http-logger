@@ -9,3 +9,13 @@ GET http://localhost:10080/hello HTTP/1.1
 ###
 ### GET Headers
 GET http://localhost:10080/headers HTTP/1.1
+
+
+###
+### POST Something
+POST http://localhost:10080/webhooks/github/http-logger HTTP/1.1
+
+{
+    "name" : "Zomaareentje",
+    "test" : "Endannogwat"
+}
