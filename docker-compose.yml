@@ -1,0 +1,12 @@
+version: '3.7'
+
+services:
+  http-logger:
+    container_name: http-logger
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    env_file:
+      - ./docker/.env
+    ports:
+      - 10080:80
