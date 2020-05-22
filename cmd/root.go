@@ -39,14 +39,11 @@ func init() {
 	})
 
 	// Persistent flags are global for all commands.
-
 	rootCmd.PersistentFlags().StringP("config", "c", "", "config file (default is empty)")
-
 	rootCmd.PersistentFlags().IntP("port", "p", 80, "port numbert (default is 80")
-
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "debug mode (default is false)")
-	// Local flags are specific for this command.
 
+	// Local flags are specific for this command.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 

@@ -13,7 +13,7 @@ GET http://localhost:10080/headers HTTP/1.1
 
 ###
 ### POST Something
-POST http://localhost:10080/webhooks/github/http-logger HTTP/1.1
+POST http://localhost:10080/webhooks/github HTTP/1.1
 
 {
     "name" : "Zomaareentje",
@@ -28,6 +28,18 @@ GET http://192.168.1.201:80/ HTTP/1.1
 ###
 ### POST Something
 POST http://192.168.1.201:80/webhooks/github/http-logger HTTP/1.1
+
+{
+    "name" : "Zomaareentje",
+    "test" : "Endannogwat"
+}
+
+
+
+
+###
+### POST Something
+POST http://demo.kleinloog.ch/webhooks/github/http-logger HTTP/1.1
 
 {
     "name" : "Zomaareentje",
