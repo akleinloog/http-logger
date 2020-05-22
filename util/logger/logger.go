@@ -1,14 +1,15 @@
 package logger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/go-chi/chi/middleware"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"os"
 	"time"
 
@@ -42,6 +43,7 @@ type RequestLogEntry struct {
 	Protocol     string
 	RemoteIP     string
 	ServerIP     string
+	Host         string
 	Status       int
 	Latency      time.Duration
 	RequestBody  string
@@ -73,15 +75,30 @@ func initRequestEntry(request *http.Request) *RequestLogEntry {
 	if request, ok := request.Context().Value(middleware.RequestIDKey).(string); ok {
 		requestId = request
 	}
+	host := request.Host
+	if host == "" && request.URL != nil {
+		host = request.URL.Host
+	}
+
+	body, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		fmt.Printf("Error reading body: %v", err)
+	}
+
+	request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
+	requestBody := fmt.Sprintf("%q", body)
 
 	entry := &RequestLogEntry{
-		RequestId: requestId,
-		Method:    request.Method,
-		URL:       request.URL.String(),
-		UserAgent: request.UserAgent(),
-		Referer:   request.Referer(),
-		Protocol:  request.Proto,
-		RemoteIP:  ipFromHostPort(request.RemoteAddr),
+		RequestId:   requestId,
+		Host:        host,
+		Method:      request.Method,
+		URL:         request.URL.String(),
+		UserAgent:   request.UserAgent(),
+		Referer:     request.Referer(),
+		Protocol:    request.Proto,
+		RemoteIP:    ipFromHostPort(request.RemoteAddr),
+		RequestBody: requestBody,
 	}
 
 	if localAddress, ok := request.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
@@ -101,18 +118,17 @@ func initRequestEntry(request *http.Request) *RequestLogEntry {
 // http logger with structured logging support.
 func RequestLogger(next http.Handler) http.Handler {
 
-	fn := func(w http.ResponseWriter, r *http.Request) {
+	fn := func(writer http.ResponseWriter, request *http.Request) {
 
-		entry := initRequestEntry(r)
+		entry := initRequestEntry(request)
 
 		start := time.Now()
 
-		request, err := httputil.DumpRequest(r, true)
-		if err != nil {
-			http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
-			return
-		}
-		entry.RequestBody = fmt.Sprintf("%q", request)
+		//request, err := httputil.DumpRequest(request, true)
+		//if err != nil {
+		//	http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
+		//	return
+		//}
 
 		rec := httptest.NewRecorder()
 
@@ -130,12 +146,13 @@ func RequestLogger(next http.Handler) http.Handler {
 
 			// this copies the recorded response to the response writer
 			for k, v := range rec.HeaderMap {
-				w.Header()[k] = v
+				writer.Header()[k] = v
 			}
-			w.WriteHeader(rec.Code)
-			rec.Body.WriteTo(w)
+			writer.WriteHeader(rec.Code)
+			rec.Body.WriteTo(writer)
 
 			DefaultLogger.Info().
+				Str("host", entry.Host).
 				Str("method", entry.Method).
 				Str("url", entry.URL).
 				Str("agent", entry.UserAgent).
@@ -151,7 +168,7 @@ func RequestLogger(next http.Handler) http.Handler {
 				Msg("")
 		}()
 
-		next.ServeHTTP(rec, WithLogEntry(r, entry))
+		next.ServeHTTP(rec, WithLogEntry(request, entry))
 	}
 
 	return http.HandlerFunc(fn)

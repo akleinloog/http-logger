@@ -15,7 +15,6 @@ func New() *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
-	//router.Use(middleware.Logger)
 	router.Use(logger.RequestLogger)
 	router.Use(middleware.Recoverer)
 	router.Use(addUserContext)
