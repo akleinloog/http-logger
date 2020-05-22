@@ -181,7 +181,8 @@ func RequestLogger(next http.Handler) http.Handler {
 
 		rec.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		rec.Header().Set("X-Content-Type-Options", "nosniff")
-		rec.Write([]byte("Request Received"))
+		rec.Write([]byte(""))
+
 	}
 
 	return http.HandlerFunc(fn)

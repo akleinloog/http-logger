@@ -65,7 +65,20 @@ func AppConfig() *Config {
 	return &config
 }
 
-// Initialize initializes the viper configuration.
+// InitializeFlags initializes the flags.
+func InitializeFlags(rootCommand *cobra.Command) {
+
+	// Persistent flags are global for all commands.
+	rootCommand.PersistentFlags().StringP("config", "c", "", "config file (default is empty)")
+	rootCommand.PersistentFlags().IntP("port", "p", 80, "port numbert (default is 80")
+	rootCommand.PersistentFlags().BoolP("debug", "d", false, "debug mode (default is false)")
+
+	// Local flags are specific for the root command.
+	rootCommand.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+}
+
+// Initialize initializes the configuration.
 func Initialize(rootCommand *cobra.Command) {
 
 	if configFile != "" {
