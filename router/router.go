@@ -35,7 +35,7 @@ func addUserContext(next http.Handler) http.Handler {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Length", "12")
+	//w.Header().Set("Content-Length", "12")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 

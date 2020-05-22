@@ -19,3 +19,17 @@ POST http://localhost:10080/webhooks/github/http-logger HTTP/1.1
     "name" : "Zomaareentje",
     "test" : "Endannogwat"
 }
+
+
+###
+### GET Root
+GET http://192.168.1.201:80/ HTTP/1.1
+
+###
+### POST Something
+POST http://192.168.1.201:80/webhooks/github/http-logger HTTP/1.1
+
+{
+    "name" : "Zomaareentje",
+    "test" : "Endannogwat"
+}
