@@ -18,6 +18,7 @@ package logger
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/middleware"
 	"io"
@@ -61,7 +62,7 @@ type RequestLogEntry struct {
 	Host         string
 	Status       int
 	Latency      time.Duration
-	RequestBody  string
+	RequestBody  []byte
 	ResponseBody string
 	RequestId    string
 }
@@ -99,12 +100,21 @@ func initRequestEntry(request *http.Request) *RequestLogEntry {
 
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
-		fmt.Printf("Error reading body: %v", err)
+		DefaultLogger.Error().Err(err).Msg("Unable to read request body")
+	} else {
+
+		request.Header.Get("content-type")
+
+		var f interface{}
+		err := json.Unmarshal(body, &f)
+		if err != nil {
+			body = []byte(fmt.Sprintf("%q", body))
+		}
+
+		request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	}
 
-	request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-
-	requestBody := fmt.Sprintf("%q", body)
+	//requestBody := fmt.Sprintf("%q", body)
 
 	entry := &RequestLogEntry{
 		RequestId:   requestId,
@@ -115,7 +125,7 @@ func initRequestEntry(request *http.Request) *RequestLogEntry {
 		Referer:     request.Referer(),
 		Protocol:    request.Proto,
 		RemoteIP:    ipFromHostPort(request.RemoteAddr),
-		RequestBody: requestBody,
+		RequestBody: body,
 	}
 
 	if localAddress, ok := request.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
@@ -173,7 +183,7 @@ func RequestLogger(next http.Handler) http.Handler {
 				Str("serverIp", entry.ServerIP).
 				Int("status", entry.Status).
 				Dur("latency", entry.Latency).
-				Str("request", entry.RequestBody).
+				RawJSON("request", entry.RequestBody).
 				Str("response", entry.ResponseBody).
 				Str("requestId", entry.RequestId).
 				Msg("")
@@ -299,4 +309,9 @@ func (l *Logger) Printf(format string, v ...interface{}) {
 // is associated, a disabled logger is returned.
 func (l *Logger) Ctx(ctx context.Context) *Logger {
 	return &Logger{logger: zerolog.Ctx(ctx)}
+}
+
+func IsJSON(str string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
 }
