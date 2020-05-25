@@ -1,18 +1,20 @@
+ARG VERSION=unspecified
+ARG GIT_URL=https://github.com/akleinloog/http-logger
+ARG GIT_COMMIT=unspecified
+
 # Build Stage
 FROM golang:1.14.3-alpine3.11 AS builder
-
 RUN apk add git
-
-WORKDIR /go/src/gRPCgo
+WORKDIR /go/src/http-logger
 ADD ./ .
-
-#RUN go get -u google.golang.org/grpc
-RUN CGO_ENABLED=0 go build -o httplog.exe
+RUN CGO_ENABLED=0 go build -o httplog
 
 # Deploy Stage
 FROM scratch
-
-COPY --from=builder /go/src/gRPCgo/httplog.exe .
-
+LABEL maintainer="arnoud@kleinloog.ch"
+LABEL version=$VERSION
+LABEL git_url=$GIT_URL
+LABEL git_commit=$GIT_COMMIT
+COPY --from=builder /go/src/http-logger/httplog .
 EXPOSE 80
 CMD ["./httplog.exe",  "serve"]
