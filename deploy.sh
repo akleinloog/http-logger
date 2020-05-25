@@ -12,8 +12,6 @@ echo "Commit: " $GIT_COMMIT
 
 docker build --force-rm --build-arg=VERSION=$CODE_VER --build-arg=VCS_REF=$GIT_COMMIT -f ./docker/Dockerfile -t akleinloog/http-logger:$CODE_VER .
 
-#--build-arg=VERSION=$CODE_VER --build-arg=VCS-REF=$GIT_COMMIT
-
 if [ $CODE_VER == $SEM_VER ]
   then
     echo "Publishing image as latest version to docker hub"

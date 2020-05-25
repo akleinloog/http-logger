@@ -1,0 +1,26 @@
+###
+### GET Root
+GET http://192.168.1.201/ HTTP/1.1
+
+###
+### GET Hello
+GET http://192.168.1.201/hello HTTP/1.1
+
+###
+### GET Headers
+GET http://192.168.1.201/headers HTTP/1.1
+
+###
+### POST Something
+POST http://192.168.1.201/webhooks/github HTTP/1.1
+
+{
+    "name" : "Something",
+    "test" : "Just to see what is logged"
+}
+
+###
+### POST Something
+POST http://192.168.1.201/webhooks/github HTTP/1.1
+
+Post some plain text, not a valid JSON
